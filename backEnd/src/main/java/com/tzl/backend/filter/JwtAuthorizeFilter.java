@@ -28,15 +28,28 @@ public class JwtAuthorizeFilter extends OncePerRequestFilter {
     protected void doFilterInternal(@NonNull HttpServletRequest request,
                                     @NonNull HttpServletResponse response,
                                     @NonNull FilterChain filterChain) throws ServletException, IOException {
-        String authorization = request.getHeader("Authorization");
-        DecodedJWT jwt = utils.resolveJwt(authorization);
-        if(jwt != null){
-            UserDetails user = utils.toUser(jwt);
-            UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(user,null,user.getAuthorities());
-            authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-            SecurityContextHolder.getContext().setAuthentication(authentication);
-            request.setAttribute("id",utils.toId(jwt));
+        try {
+            String authorization = request.getHeader("Authorization");
+            // 如果没头，直接跳过，不设置认证，让 Spring Security 报 401
+            if (authorization != null && authorization.startsWith("Bearer ")) {
+                DecodedJWT jwt = utils.resolveJwt(authorization);
+                if (jwt != null) {
+                    UserDetails user = utils.toUser(jwt);
+                    // 确保 user 不为 null
+                    if (user != null) {
+                        UsernamePasswordAuthenticationToken authentication =
+                                new UsernamePasswordAuthenticationToken(user, null, user.getAuthorities());
+                        authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                        SecurityContextHolder.getContext().setAuthentication(authentication);
+                        request.setAttribute("id", utils.toId(jwt));
+                    }
+                }
+            }
+        } catch (Exception e) {
+            // 记录日志，但不要抛出，避免中断请求链，让后续 Spring Security 处理 401
+            e.printStackTrace();
         }
-        filterChain.doFilter(request,response);
+
+        filterChain.doFilter(request, response);
     }
 }

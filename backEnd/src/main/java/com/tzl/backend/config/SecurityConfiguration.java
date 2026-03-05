@@ -11,6 +11,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -21,6 +22,7 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 import java.io.IOException;
+import java.io.PrintWriter;
 
 
 @Configuration
@@ -32,6 +34,8 @@ public class SecurityConfiguration {
     @Autowired
     JwtAuthorizeFilter filter;
 
+
+
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         return http
@@ -39,6 +43,8 @@ public class SecurityConfiguration {
                         .requestMatchers("/api/auth/**").permitAll()
                         .anyRequest().authenticated()
                 )
+//                .formLogin(AbstractHttpConfigurer::disable)
+//                .logout(AbstractHttpConfigurer::disable)
                .formLogin(conf -> conf
                         .loginProcessingUrl("/api/auth/login")
                         .loginPage("/api/auth/login")
@@ -74,6 +80,7 @@ public class SecurityConfiguration {
     public void onUnAuthorized(HttpServletRequest request,
                                HttpServletResponse response,
                                AuthenticationException e) throws IOException {
+        response.setContentType("application/json;charset=utf-8");
         response.getWriter().write(RestBean.unAuthorized(e.getMessage()).asJsonString());
 
     }
@@ -102,8 +109,15 @@ public class SecurityConfiguration {
 
     private void onLogoutSuccess(HttpServletRequest request,
                                  HttpServletResponse response,
-                                 Authentication authentication){
-
+                                 Authentication authentication) throws IOException {
+        response.setContentType("application/json;charset=utf-8");
+        PrintWriter writer = response.getWriter();
+        String authorization = request.getHeader("Authorization");
+        if(utils.invalidateJwt(authorization)){
+            writer.write(RestBean.success().asJsonString());
+        }else{
+            writer.write(RestBean.failure(400,"退出登录失败！").asJsonString());
+        }
     }
 
 
