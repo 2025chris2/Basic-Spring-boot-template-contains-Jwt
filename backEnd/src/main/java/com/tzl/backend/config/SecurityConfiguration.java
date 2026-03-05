@@ -1,8 +1,12 @@
 package com.tzl.backend.config;
 
+import com.tzl.backend.Entity.RestBean;
+import com.tzl.backend.Entity.vo.response.AuthorizeVO;
+import com.tzl.backend.Utils.JwtUtils;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -10,6 +14,7 @@ import org.springframework.security.config.annotation.web.configurers.AbstractHt
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
+import org.springframework.security.core.userdetails.User;
 import org.springframework.security.web.SecurityFilterChain;
 
 import java.io.IOException;
@@ -17,6 +22,9 @@ import java.io.IOException;
 
 @Configuration
 public class SecurityConfiguration {
+
+    @Autowired
+    JwtUtils utils;
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
@@ -49,7 +57,14 @@ public class SecurityConfiguration {
                                         HttpServletResponse response,
                                         Authentication authentication) throws IOException, ServletException {
         response.setContentType("application/json;charset=utf-8");
-        response.getWriter().write("成功!");
+        User user = (User) authentication.getPrincipal();
+        String token = utils.createJwt(user,1,"小明");
+        AuthorizeVO vo = new AuthorizeVO();
+        vo.setExpire(utils.expireTime());
+        vo.setRole("");
+        vo.setToken(token);
+        vo.setUsername("小明");
+        response.getWriter().write(RestBean.success(vo).asJsonString());
     }
 
     private void onAuthenticationFailure(HttpServletRequest request,
