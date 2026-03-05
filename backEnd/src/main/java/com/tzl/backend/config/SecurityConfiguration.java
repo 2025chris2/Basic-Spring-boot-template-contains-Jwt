@@ -3,12 +3,14 @@ package com.tzl.backend.config;
 import com.tzl.backend.Entity.RestBean;
 import com.tzl.backend.Entity.vo.response.AuthorizeVO;
 import com.tzl.backend.Utils.JwtUtils;
+import com.tzl.backend.filter.JwtAuthorizeFilter;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -16,6 +18,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 import java.io.IOException;
 
@@ -26,6 +29,9 @@ public class SecurityConfiguration {
     @Autowired
     JwtUtils utils;
 
+    @Autowired
+    JwtAuthorizeFilter filter;
+
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         return http
@@ -33,8 +39,9 @@ public class SecurityConfiguration {
                         .requestMatchers("/api/auth/**").permitAll()
                         .anyRequest().authenticated()
                 )
-                .formLogin(conf -> conf
+               .formLogin(conf -> conf
                         .loginProcessingUrl("/api/auth/login")
+                        .loginPage("/api/auth/login")
                         .successHandler(this::onAuthenticationSuccess)
                         .failureHandler(this::onAuthenticationFailure)
                 )
@@ -42,15 +49,34 @@ public class SecurityConfiguration {
                         .logoutUrl("/api/auth/logout")
                         .logoutSuccessHandler(this::onLogoutSuccess)
                 )
+                .exceptionHandling(conf -> conf
+                        .authenticationEntryPoint(this::onUnAuthorized)
+                        .accessDeniedHandler(this::onAccessDeny)
+                )
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(conf -> conf
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 )
+                .addFilterBefore(filter, UsernamePasswordAuthenticationFilter.class)
                 .build();
 
 
     }
 
+    public void onAccessDeny(HttpServletRequest request,
+                             HttpServletResponse response,
+                             AccessDeniedException e) throws IOException {
+        response.setContentType("application/json;charset=utf-8");
+        response.getWriter().write(RestBean.forbidden(e.getMessage()).asJsonString());
+
+    }
+
+    public void onUnAuthorized(HttpServletRequest request,
+                               HttpServletResponse response,
+                               AuthenticationException e) throws IOException {
+        response.getWriter().write(RestBean.unAuthorized(e.getMessage()).asJsonString());
+
+    }
 
 
     private void onAuthenticationSuccess(HttpServletRequest request,
@@ -71,7 +97,7 @@ public class SecurityConfiguration {
                                         HttpServletResponse response,
                                         AuthenticationException e) throws IOException {
         response.setContentType("application/json;charset=utf-8");
-        response.getWriter().write("失败");
+        response.getWriter().write(RestBean.unAuthorized(e.getMessage()).asJsonString());
     }
 
     private void onLogoutSuccess(HttpServletRequest request,
