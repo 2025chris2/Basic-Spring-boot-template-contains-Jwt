@@ -1,9 +1,11 @@
 package com.tzl.backend.config;
 
 import com.tzl.backend.Entity.RestBean;
+import com.tzl.backend.Entity.dto.Account;
 import com.tzl.backend.Entity.vo.response.AuthorizeVO;
 import com.tzl.backend.Utils.JwtUtils;
 import com.tzl.backend.filter.JwtAuthorizeFilter;
+import com.tzl.backend.service.AccountService;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -34,6 +36,9 @@ public class SecurityConfiguration {
     @Autowired
     JwtAuthorizeFilter filter;
 
+    @Autowired
+    AccountService service;
+
 
 
     @Bean
@@ -47,7 +52,6 @@ public class SecurityConfiguration {
 //                .logout(AbstractHttpConfigurer::disable)
                .formLogin(conf -> conf
                         .loginProcessingUrl("/api/auth/login")
-                        .loginPage("/api/auth/login")
                         .successHandler(this::onAuthenticationSuccess)
                         .failureHandler(this::onAuthenticationFailure)
                 )
@@ -91,12 +95,13 @@ public class SecurityConfiguration {
                                         Authentication authentication) throws IOException, ServletException {
         response.setContentType("application/json;charset=utf-8");
         User user = (User) authentication.getPrincipal();
-        String token = utils.createJwt(user,1,"小明");
+        Account account = service.findAccountByNameOrEmail(user.getUsername());
+        String token = utils.createJwt(user,account.getId(),account.getUsername());
         AuthorizeVO vo = new AuthorizeVO();
         vo.setExpire(utils.expireTime());
-        vo.setRole("");
+        vo.setRole(account.getRole());
         vo.setToken(token);
-        vo.setUsername("小明");
+        vo.setUsername(account.getUsername());
         response.getWriter().write(RestBean.success(vo).asJsonString());
     }
 
